@@ -1,0 +1,36 @@
+{
+  "import": [
+    "pandas as pd",
+    "from kmodes.kprototypes import KPrototypes",
+    "import mysql.connector",
+    "from sklearn.preprocessing import LabelEncoder",
+    "import seaborn as sns",
+    "import matplotlib.pyplot as plt",
+    "import numpy as np",
+    "import os",
+    "from datetime import datetime"
+  ],
+  "functions": {
+    "fetch_customer_data": {
+      "description": "Connect to the database and fetch data",
+      "code": "..."
+    },
+    "preprocess_data": {
+      "description": "Preprocess the data",
+      "code": "..."
+    },
+    "apply_kprototypes": {
+      "description": "Apply K-Prototypes algorithm",
+      "code": "..."
+    },
+    "visualize_clusters": {
+      "description": "Visualize the results",
+      "code": "..."
+    },
+    "main": {
+      "description": "Main function",
+      "code": "..."
+    }
+  }
+}
+

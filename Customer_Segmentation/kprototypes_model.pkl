@@ -1,0 +1,12 @@
+import pickle
+
+# Apply K-Prototypes algorithm and save the model as a pickle file
+def apply_kprototypes(df, n_clusters=5):
+    kproto = KPrototypes(n_clusters=n_clusters, init='Huang', random_state=42)
+    clusters = kproto.fit_predict(df, categorical=[0, 2, 3])
+    
+    # Save the model to a pickle file
+    with open('kprototypes_model.pkl', 'wb') as f:
+        pickle.dump(kproto, f)
+    
+    return clusters, kproto
