@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Basket Analysis</title>
+</head>
+<body>
+    <h1>Market Basket Analysis</h1>
+    <button onclick="runMba()">Run Analysis</button>
+    <div id="results">
+        <h2>Insights</h2>
+        <p id="insights"></p>
+        <h2>Top Rules</h2>
+        <img id="plot" src="" alt="Top Rules Plot" style="display:none;">
+    </div>
+    <script>
+        function runMba() {
+            fetch('/run_mba')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('insights').innerHTML = data.insights;
+                        document.getElementById('plot').src = data.plot_url;
+                        document.getElementById('plot').style.display = 'block';
+                    } else {
+                        document.getElementById('insights').innerText = data.message;
+                        document.getElementById('plot').style.display = 'none';
+                    }
+                });
+        }
+    </script>
+</body>
+</html>
