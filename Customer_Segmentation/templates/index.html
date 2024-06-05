@@ -1,29 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Segmentation Visualizations</title>
-    <style>
-        img {
-            display: block;
-            margin: 20px auto;
-            max-width: 100%;
-            height: auto;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Segmentation</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
-    <h1 style="text-align: center;">Customer Segmentation Visualizations</h1>
+  <div class="container">
+    <h1>Customer Segmentation Summary</h1>
     <div>
-        <img src="{{ url_for('static', filename=pairplot_filename) }}" alt="Pairplot">
-        <img src="{{ url_for('static', filename=barplot_filename) }}" alt="Barplot">
-        <img src="{{ url_for('static', filename=scatterplot_age_total_spend_filename) }}" alt="Scatterplot Age vs Total Spend">
-        <img src="{{ url_for('static', filename=scatterplot_age_previous_purchase_filename) }}" alt="Scatterplot Age vs Previous Purchase">
-        <img src="{{ url_for('static', filename=scatterplot_total_spend_previous_purchase_filename) }}" alt="Scatterplot Total Spend vs Previous Purchase">
+      {{ summary_table|safe }}
     </div>
+    <h2>Cluster Visualizations</h2>
+    {% for plot_url in plot_urls %}
+    <div>
+      <img src="{{ url_for('plot', filename=plot_url) }}" alt="Cluster Plot" class="img-fluid">
+    </div>
+    {% endfor %}
+  </div>
 </body>
 </html>
-
-
-

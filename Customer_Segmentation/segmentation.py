@@ -4,8 +4,7 @@ import mysql.connector
 from sklearn.preprocessing import LabelEncoder
 import seaborn as sns
 import matplotlib.pyplot as plt
-import numpy as np
-from datetime import datetime
+import os
 
 # Connect to the database and fetch data
 def fetch_customer_data():
@@ -81,7 +80,7 @@ def create_summary_table(df):
     
     return summary_table
 
-# Visualize the results
+# Visualize the results and return the updated DataFrame
 def visualize_clusters(df, clusters, kproto):
     df['Cluster'] = clusters
     
@@ -98,30 +97,45 @@ def visualize_clusters(df, clusters, kproto):
         'diamond': 'blue'
     }
 
+    plots_dir = os.path.join(os.path.dirname(__file__), 'static', 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+    
     # Pairplot to visualize the clusters
+    pairplot_path = os.path.join(plots_dir, 'pairplot.png')
     sns.pairplot(df, hue='Cluster_Label', palette=cluster_colors)
-    plt.show()
+    plt.savefig(pairplot_path)
+    plt.close()
 
     # Bar plot for previous purchase vs total spend
+    barplot_path = os.path.join(plots_dir, 'barplot.png')
     plt.figure(figsize=(10, 7))
     sns.barplot(data=df, x='previous_purchase', y='total_spend', hue='Cluster_Label', palette=cluster_colors, errorbar=None)
     plt.title('Total Spend vs Previous Purchase')
-    plt.show()
+    plt.savefig(barplot_path)
+    plt.close()
 
     # Scatter plots for numerical features
+    scatterplot_paths = []
     scatter_features = [('age', 'total_spend'), ('age', 'previous_purchase'), ('total_spend', 'previous_purchase')]
     for x_feature, y_feature in scatter_features:
+        scatterplot_path = os.path.join(plots_dir, f'scatter_{x_feature}_{y_feature}.png')
         plt.figure(figsize=(10, 6))
         sns.scatterplot(data=df, x=x_feature, y=y_feature, hue='Cluster_Label', palette=cluster_colors, s=100, alpha=0.6)
-        plt.show()
+        plt.savefig(scatterplot_path)
+        plt.close()
+        scatterplot_paths.append(scatterplot_path)
 
     # Pie chart for cluster distribution
+    piechart_path = os.path.join(plots_dir, 'piechart.png')
     cluster_counts = df['Cluster_Label'].value_counts()
     plt.figure(figsize=(10, 7))
     plt.pie(cluster_counts, labels=cluster_counts.index, autopct='%1.1f%%', colors=[cluster_colors[label] for label in cluster_counts.index], startangle=140)
     plt.title('Customer Distribution by Cluster')
     plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-    plt.show()
+    plt.savefig(piechart_path)
+    plt.close()
+
+    return df, [pairplot_path, barplot_path, *scatterplot_paths, piechart_path]
 
 # Update the database with new cluster labels
 def update_database_with_clusters(ids, clusters):
@@ -164,14 +178,15 @@ def main():
     # Update database with new cluster labels
     update_database_with_clusters(ids, clusters)
      
-    # Visualize the clusters
-    visualize_clusters(df, clusters, kproto)
+    # Visualize the clusters and return the updated DataFrame and plot paths
+    df, plot_paths = visualize_clusters(df, clusters, kproto)
     
     # Create and display the summary table
     summary_table = create_summary_table(df)
     print(summary_table)
     
-    print("Visualizations displayed successfully.")
+    print("Visualizations saved successfully.")
+    return plot_paths
 
 if __name__ == "__main__":
     main()

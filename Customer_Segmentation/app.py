@@ -1,37 +1,44 @@
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_file
 import os
-import json
+from segmentation import fetch_customer_data, preprocess_data, apply_kprototypes, create_summary_table, visualize_clusters, create_membership_column_if_not_exists, update_database_with_clusters
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    # Define filenames based on your pattern
-    timestamp = "20240602000401"  # Example timestamp
-    scatter_timestamp = "20240602000009"  # Example timestamp for scatter plots
+    # Create membership column if it doesn't exist
+    create_membership_column_if_not_exists()
 
-    pairplot_filename = f'pairplot_{timestamp}.png'
-    barplot_filename = f'barplot_{timestamp}.png'
-    scatterplot_age_total_spend_filename = f'scatterplot_age_total_spend_{scatter_timestamp}.png'
-    scatterplot_age_previous_purchase_filename = f'scatterplot_age_previous_purchase_{scatter_timestamp}.png'
-    scatterplot_total_spend_previous_purchase_filename = f'scatterplot_total_spend_previous_purchase_{scatter_timestamp}.png'
+    # Fetch customer data
+    customer_df = fetch_customer_data()
+    
+    # Preprocess the data
+    df, ids = preprocess_data(customer_df)
+    
+    # Apply K-Prototypes
+    clusters, kproto = apply_kprototypes(df, n_clusters=5)
+    
+    # Update database with new cluster labels
+    update_database_with_clusters(ids, clusters)
+    
+    # Visualize the clusters and get plot paths
+    df, plot_paths = visualize_clusters(df, clusters, kproto)
+    
+    # Create summary table
+    summary_table = create_summary_table(df)
+    
+    # Convert the summary table to HTML
+    summary_table_html = summary_table.to_html(classes='table table-striped', index=False)
+    
+    # Generate URLs for the plots
+    plot_urls = [os.path.basename(plot_path) for plot_path in plot_paths]
 
-    return render_template('index.html',
-                           pairplot_filename=pairplot_filename,
-                           barplot_filename=barplot_filename,
-                           scatterplot_age_total_spend_filename=scatterplot_age_total_spend_filename,
-                           scatterplot_age_previous_purchase_filename=scatterplot_age_previous_purchase_filename,
-                           scatterplot_total_spend_previous_purchase_filename=scatterplot_total_spend_previous_purchase_filename)
+    return render_template('index.html', summary_table=summary_table_html, plot_urls=plot_urls)
 
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    return send_from_directory(os.path.join(app.root_path, 'static'), filename)
-
-@app.route('/results')
-def results():
-    return send_from_directory(app.root_path, 'cluster_results.json')
+@app.route('/plot/<filename>')
+def plot(filename):
+    plot_path = os.path.join(os.path.dirname(__file__), 'static', 'plots', filename)
+    return send_file(plot_path, mimetype='image/png')
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
