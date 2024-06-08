@@ -1,0 +1,54 @@
+from flask import Flask, request, jsonify
+import mysql.connector
+from mysql.connector import Error
+
+app = Flask(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    'host': '103.219.251.246',
+    'user': 'braincor_ps01',
+    'password': 'Bangkit12345.',
+    'database': 'braincor_ps01'
+}
+
+# Function to insert data into the database
+def insert_customer(data):
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        if conn.is_connected():
+            cursor = conn.cursor()
+            query = """
+                INSERT INTO customers (ID, age, customer_name, gender, job, membership, previous_purchase, segment, total_spend)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(query, (
+                data['ID'],
+                data['age'],
+                data['customer_name'],
+                data['gender'],
+                data['job'],
+                data['membership'],
+                data['previous_purchase'],
+                data['segment'],
+                data['total_spend']
+            ))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
+
+@app.route('/customers', methods=['POST'])
+def add_customer():
+    data = request.json
+    if insert_customer(data):
+        return jsonify({"message": "Customer added successfully"}), 201
+    else:
+        return jsonify({"error": "Unable to add customer"}), 500
+
+if __name__ == "__main__":
+    print("Starting Flask server...")
+    app.run(debug=True)

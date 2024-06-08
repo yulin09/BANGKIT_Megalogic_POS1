@@ -1,0 +1,29 @@
+from flask import Flask, jsonify
+import mysql.connector
+
+app = Flask(__name__)
+
+def fetch_total_users():
+    conn = mysql.connector.connect(
+        host='103.219.251.246',
+        user='braincor_ps01',
+        password='Bangkit12345.',
+        database='braincor_ps01'
+    )
+
+    query = "SELECT COUNT(*) FROM customers"
+    cursor = conn.cursor()
+    cursor.execute(query)
+    total_users = cursor.fetchone()[0]
+    cursor.close()
+    conn.close()
+    
+    return total_users
+
+@app.route('/api/total_users', methods=['GET'])
+def get_total_users():
+    total_users = fetch_total_users()
+    return jsonify(total_users=total_users)
+
+if __name__ == '__main__':
+    app.run(debug=True)

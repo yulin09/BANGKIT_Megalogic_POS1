@@ -1,0 +1,74 @@
+from flask import Flask, jsonify
+import mysql.connector
+from mysql.connector import Error
+import pandas as pd
+from kmodes.kprototypes import KPrototypes
+from sklearn.preprocessing import LabelEncoder
+
+app = Flask(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    'host': '103.219.251.246',
+    'user': 'braincor_ps01',
+    'password': 'Bangkit12345.',
+    'database': 'braincor_ps01'
+}
+
+# Fetch customer data
+def fetch_customer_data():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        query = """
+            SELECT ID, customer_name, gender, age, job, segment, total_spend, previous_purchase FROM customers
+        """
+        cursor = conn.cursor()
+        cursor.execute(query)
+        data = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        columns = ['ID', 'customer_name', 'gender', 'age', 'job', 'segment', 'total_spend', 'previous_purchase']
+        customer_df = pd.DataFrame(data, columns=columns)
+        return customer_df
+    except Error as e:
+        print(f"Database error: {e}")
+        return None
+
+# Preprocess the data
+def preprocess_data(customer_df):
+    df = customer_df.drop(['ID', 'customer_name'], axis=1)
+    le = LabelEncoder()
+    for column in ['gender', 'job', 'segment']:
+        df[column] = le.fit_transform(df[column])
+    return df, customer_df['ID']
+
+# Apply K-Prototypes algorithm
+def apply_kprototypes(df, n_clusters=5):
+    kproto = KPrototypes(n_clusters=n_clusters, init='Huang', random_state=42)
+    clusters = kproto.fit_predict(df, categorical=[0, 2, 3])
+    return clusters, kproto
+
+# Create the summary table
+def create_summary_table(df, clusters):
+    df['Cluster'] = clusters
+    cluster_labels = {2: 'bronze', 3: 'silver', 1: 'gold', 4: 'platinum', 0: 'diamond'}
+    df['Cluster_Label'] = df['Cluster'].map(cluster_labels)
+    summary_table = df.groupby(['previous_purchase', 'Cluster_Label'])['total_spend'].sum().unstack().fillna(0)
+    summary_table.reset_index(inplace=True)
+    summary_table.columns.name = None
+    summary_table.rename_axis(None, axis=1, inplace=True)
+    return summary_table
+
+# API endpoint to fetch customer segmentation
+@app.route('/customer_segmentation', methods=['GET'])
+def customer_segmentation():
+    customer_df = fetch_customer_data()
+    if customer_df is None:
+        return jsonify({"error": "Unable to fetch customer data"}), 500
+    df, ids = preprocess_data(customer_df)
+    clusters, kproto = apply_kprototypes(df, n_clusters=5)
+    summary_table = create_summary_table(df, clusters)
+    return jsonify(summary_table.to_dict(orient='list'))
+
+if __name__ == "__main__":
+    app.run(debug=True)

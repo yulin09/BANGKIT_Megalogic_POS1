@@ -1,0 +1,54 @@
+from flask import Flask, request, jsonify
+import mysql.connector
+from mysql.connector import Error
+import logging
+
+app = Flask(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    'host': '103.219.251.246',
+    'user': 'braincor_ps01',
+    'password': 'Bangkit12345.',
+    'database': 'braincor_ps01'
+}
+
+# Function to insert data into the orders table
+def insert_order(data):
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        if conn.is_connected():
+            cursor = conn.cursor()
+            query = """
+                INSERT INTO orders (ID, order_date, ship_date, customer_id, product_id, product_name)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(query, (
+                data['ID'],
+                data['order_date'],
+                data['ship_date'],
+                data['customer_id'],
+                data['product_id'],
+                data['product_name']
+            ))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
+
+@app.route('/orders', methods=['POST'])
+def add_order():
+    data = request.json
+    logging.debug(f"Received data: {data}")
+    if insert_order(data):
+        return jsonify({"message": "Order added successfully"}), 201
+    else:
+        return jsonify({"error": "Unable to add order"}), 500
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    print("Starting Flask server...")
+    app.run(debug=True)
