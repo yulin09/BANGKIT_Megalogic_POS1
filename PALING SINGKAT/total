@@ -1,0 +1,133 @@
+from flask import Flask, jsonify
+import mysql.connector
+from mysql.connector import Error
+
+app = Flask(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    'host': '103.219.251.246',
+    'user': 'braincor_ps01',
+    'password': 'Bangkit12345.',
+    'database': 'braincor_ps01'
+}
+
+# Function to fetch total users
+def fetch_total_users():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        if conn.is_connected():
+            query = "SELECT COUNT(*) FROM customers"
+            cursor = conn.cursor()
+            cursor.execute(query)
+            total_users = cursor.fetchone()[0]
+            cursor.close()
+            conn.close()
+            return total_users
+    except Error as e:
+        print(f"Database error: {e}")
+        return None
+
+@app.route('/api/total_users', methods=['GET'])
+def get_total_users():
+    total_users = fetch_total_users()
+    if total_users is not None:
+        return jsonify(total_users=total_users), 200
+    else:
+        return jsonify(error="Unable to fetch total users"), 500
+
+# Function to fetch total revenue
+def get_total_revenue():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        if conn.is_connected():
+            cursor = conn.cursor(dictionary=True)
+            
+            # Query to fetch order details and product unit prices
+            query = """
+                SELECT o.ID, o.order_date, o.ship_date, o.customer_id, o.product_id, o.product_name, p.unit_price
+                FROM orders o
+                JOIN products p ON o.product_id = p.ID
+            """
+            cursor.execute(query)
+            orders = cursor.fetchall()
+            
+            if not orders:
+                return None
+
+            total_revenue = sum(order['unit_price'] for order in orders)
+            
+            cursor.close()
+            conn.close()
+            return total_revenue
+        else:
+            return None
+    except Error as e:
+        print(f"Database error: {e}")
+        return None
+    except Exception as e:
+        print(f"General error: {e}")
+        return None
+
+@app.route('/api/total_revenue', methods=['GET'])
+def total_revenue():
+    revenue = get_total_revenue()
+    if revenue is not None:
+        return jsonify(total_revenue=revenue), 200
+    else:
+        return jsonify(error="Unable to fetch total revenue"), 500
+
+# Function to fetch total orders
+def get_total_orders():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        if conn.is_connected():
+            cursor = conn.cursor()
+            query = "SELECT COUNT(*) AS total_orders FROM orders"
+            cursor.execute(query)
+            result = cursor.fetchone()
+            total_orders = result[0] if result else 0
+            cursor.close()
+            conn.close()
+            return total_orders
+    except Error as e:
+        print(f"Database error: {e}")
+        return None
+    except Exception as e:
+        print(f"General error: {e}")
+        return None
+
+@app.route('/api/total_orders', methods=['GET'])
+def total_orders():
+    orders_count = get_total_orders()
+    if orders_count is not None:
+        return jsonify(total_orders=orders_count), 200
+    else:
+        return jsonify(error="Unable to fetch total orders"), 500
+
+# Function to fetch total number of products
+def fetch_total_products():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        if conn.is_connected():
+            query = "SELECT COUNT(*) FROM products"
+            cursor = conn.cursor()
+            cursor.execute(query)
+            total_products = cursor.fetchone()[0]
+            cursor.close()
+            conn.close()
+            return total_products
+    except Error as e:
+        print(f"Database error: {e}")
+        return None
+
+@app.route('/api/total_products', methods=['GET'])
+def get_total_products():
+    total_products = fetch_total_products()
+    if total_products is not None:
+        return jsonify(total_products=total_products), 200
+    else:
+        return jsonify(error="Unable to fetch total products"), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
