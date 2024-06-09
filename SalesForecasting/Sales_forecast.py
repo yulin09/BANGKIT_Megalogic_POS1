@@ -76,10 +76,9 @@ def monthly_sales_latest_year(merged_df):
     latest_year = merged_df['year'].max()
     merged_df['month'] = merged_df['order_date'].dt.month_name()
     
-    # Define the categorical type with the correct order
     month_order = [
-        'January', 'February', 'March', 'April', 'May', 'June', 
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+        'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'
     ]
     merged_df['month'] = pd.Categorical(merged_df['month'], categories=month_order, ordered=True)
     
@@ -94,12 +93,6 @@ def top_3_products_last_month_sales(merged_df):
     top_products_last_month = top_products_last_month.sort_values('sales', ascending=False)
     top_3_products_last_month = top_products_last_month.head(3)
     return top_3_products_last_month
-
-def sales_last_month(merged_df):
-    merged_df['month'] = merged_df['order_date'].dt.to_period('M')
-    last_month = merged_df['month'].max()
-    sales_last_month = merged_df[merged_df['month'] == last_month].groupby('product_name').size().reset_index(name='units_sold')
-    return sales_last_month
 
 def future_sales_predictions(model_fit, test_data):
     future_dates = pd.date_range(start=test_data.index[-1] + pd.Timedelta(days=1), periods=90, freq='D')
@@ -165,42 +158,6 @@ def top_3_products_last_month_route():
     merged_df = preprocess_data(orders_df, products_df)
     top_3_products_last_month = top_3_products_last_month_sales(merged_df)
     return jsonify(top_3_products_last_month.to_dict(orient='list'))
-
-@app.route('/sales-last-month', methods=['GET']) #Key error 'month'
-def sales_last_month_route():
-    orders_df, products_df = fetch_data()
-    if orders_df is None or products_df is None:
-        return jsonify({"error": "Unable to fetch data from the database"}), 500
-    
-    merged_df = preprocess_data(orders_df, products_df)
-    sales_last_month_data = sales_last_month(merged_df)
-    return jsonify(sales_last_month_data.to_dict(orient='list'))
-
-@app.route('/future-sales-predictions', methods=['GET']) 
-def future_sales_predictions_route():
-    orders_df, products_df = fetch_data()
-    if orders_df is None or products_df is None:
-        return jsonify({"error": "Unable to fetch data from the database"}), 500
-    
-    merged_df = preprocess_data(orders_df, products_df)
-    time_series = aggregate_sales_by_date(merged_df)
-
-    end_date = time_series.index[-1]
-    split_date = end_date - pd.DateOffset(months=3)
-
-    train_data = time_series.loc[time_series.index < split_date]
-    test_data = time_series.loc[time_series.index >= split_date]
-
-    model_fit = train_arima_model(train_data)
-    future_data_monthly, next_month_prediction, next_trimester_prediction = future_sales_predictions(model_fit, test_data)
-
-    result = {
-        'future_sales': future_data_monthly.to_dict(),
-        'next_month_prediction': next_month_prediction,
-        'next_trimester_prediction': next_trimester_prediction
-    }
-
-    return jsonify(result)
 
 @app.route('/future-sales-next-month', methods=['GET'])
 def future_sales_next_month_route():
