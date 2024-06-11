@@ -3,8 +3,6 @@ import mysql.connector
 import pandas as pd
 from mlxtend.frequent_patterns import apriori, association_rules
 from mlxtend.preprocessing import TransactionEncoder
-import matplotlib.pyplot as plt
-import os
 
 app = Flask(__name__)
 
@@ -76,6 +74,13 @@ def market_basket_analysis(orders_df):
             # Convert frozenset to list for JSON serialization
             rules['antecedents'] = rules['antecedents'].apply(lambda x: list(x))
             rules['consequents'] = rules['consequents'].apply(lambda x: list(x))
+
+            # Convert support and confidence to percentages and format as strings
+            rules['support'] = (rules['support'] * 100).map('{:.2f}%'.format)
+            rules['confidence'] = (rules['confidence'] * 100).map('{:.2f}%'.format)
+
+            # Select only the relevant columns
+            rules = rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']]
 
             return rules
         else:
