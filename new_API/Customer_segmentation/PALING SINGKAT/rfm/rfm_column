@@ -1,0 +1,123 @@
+from flask import Flask, jsonify
+import pandas as pd
+import mysql.connector
+
+app = Flask(__name__)
+
+# Function to fetch customer data
+def fetch_customer_data():
+    conn = mysql.connector.connect(
+        host='103.219.251.246',
+        user='braincor_ps01',
+        password='Bangkit12345.',
+        database='braincor_ps01'
+    )
+
+    customer_query = """
+        SELECT ID, customer_name, gender, age, job, segment, total_spend, previous_purchase, membership FROM customers
+    """
+
+    order_query = """
+        SELECT customer_id, MAX(order_date) as last_purchase_date, COUNT(*) as order_count FROM orders GROUP BY customer_id
+    """
+
+    cursor = conn.cursor()
+    cursor.execute(customer_query)
+    customer_data = cursor.fetchall()
+    customer_columns = ['ID', 'customer_name', 'gender', 'age', 'job', 'segment', 'total_spend', 'previous_purchase', 'membership']
+    customer_df = pd.DataFrame(customer_data, columns=customer_columns)
+
+    cursor.execute(order_query)
+    order_data = cursor.fetchall()
+    order_columns = ['customer_id', 'last_purchase_date', 'order_count']
+    order_df = pd.DataFrame(order_data, columns=order_columns)
+
+    cursor.close()
+    conn.close()
+
+    # Merge the dataframes on customer ID
+    customer_df = customer_df.merge(order_df, left_on='ID', right_on='customer_id', how='left')
+
+    return customer_df
+
+# Function to calculate RFM
+def calculate_rfm(customer_df):
+    current_date = pd.Timestamp.now()
+    customer_df['last_purchase_date'] = pd.to_datetime(customer_df['last_purchase_date'])
+    customer_df['recency'] = (current_date - customer_df['last_purchase_date']).dt.days
+    customer_df['frequency'] = customer_df['order_count']
+    customer_df['monetary'] = customer_df['total_spend']
+
+    # Handle missing values in case there are any NaNs
+    customer_df['recency'].fillna((current_date - pd.Timestamp('1970-01-01')).days, inplace=True)
+    customer_df['frequency'].fillna(0, inplace=True)
+    customer_df['monetary'].fillna(0, inplace=True)
+
+    rfm_df = customer_df[['ID', 'customer_name', 'recency', 'frequency', 'monetary', 'total_spend', 'previous_purchase', 'membership']].copy()
+
+    rfm_df['R_rank'] = pd.qcut(rfm_df['recency'], 4, labels=[4, 3, 2, 1])
+    rfm_df['F_rank'] = pd.qcut(rfm_df['frequency'], 4, labels=[1, 2, 3, 4])
+    rfm_df['M_rank'] = pd.qcut(rfm_df['monetary'], 4, labels=[1, 2, 3, 4])
+    rfm_df['RFM_score'] = rfm_df['R_rank'].astype(str) + rfm_df['F_rank'].astype(str) + rfm_df['M_rank'].astype(str)
+    rfm_df['segment'] = rfm_df['RFM_score'].apply(map_rfm_to_segment)
+    
+    return rfm_df
+
+def map_rfm_to_segment(rfm_score):
+    if rfm_score == '444':
+        return 'Lost Customers'
+    elif rfm_score == '111':
+        return 'Best Customers'
+    elif rfm_score[1:] == '44':
+        return 'Almost Lost'
+    elif rfm_score[0] == '4':
+        return 'Lost Cheap Customers'
+    elif rfm_score[0] == '1':
+        return 'Loyal Customers'
+    elif rfm_score[1:] == '11':
+        return 'Big Spenders'
+    else:
+        return 'Other'
+
+@app.route('/api/rfm-barplot', methods=['GET'])
+def get_rfm_data():
+    print("Endpoint '/api/rfm-barplot' called")
+    customer_df = fetch_customer_data()
+    rfm_df = calculate_rfm(customer_df)
+    
+    # Calculate the average monetary value per segment
+    result = rfm_df.groupby('segment').agg({
+        'monetary': 'mean'
+    }).reset_index()
+    
+    # Optionally, rename the 'monetary' column to 'average_monetary' for clarity
+    result = result.rename(columns={'monetary': 'average_monetary'})
+    
+    # Sort the result by average monetary value in descending order
+    result = result.sort_values(by='average_monetary', ascending=False)
+
+    # Format the average monetary values to 2 decimal places
+    result['average_monetary'] = result['average_monetary'].apply(lambda x: round(x, 2))
+
+    result_dict = {
+        'average_monetary': result['average_monetary'].tolist(),
+        'segment': result['segment'].tolist()
+    }
+
+    print("RFM Data Summary:")
+    print(result)
+    
+    return jsonify(result_dict)
+
+@app.route('/api/customer-segments-table', methods=['GET'])
+def get_customer_segments():
+    print("Endpoint '/api/customer-segments-table' called")
+    customer_df = fetch_customer_data()
+    rfm_df = calculate_rfm(customer_df)
+    result = rfm_df[['ID', 'customer_name', 'total_spend', 'previous_purchase', 'segment', 'membership']]
+    print("Returning customer segments")
+    return jsonify(result.to_dict(orient='records'))
+
+if __name__ == '__main__':
+    print("Starting Flask server...")
+    app.run(debug=True)

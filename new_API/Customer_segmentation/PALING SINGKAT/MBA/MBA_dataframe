@@ -1,0 +1,131 @@
+from flask import Flask, jsonify
+import mysql.connector
+import pandas as pd
+from mlxtend.frequent_patterns import apriori, association_rules
+from mlxtend.preprocessing import TransactionEncoder
+
+app = Flask(__name__)
+
+# Function to fetch orders data from MySQL
+def fetch_orders_data():
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="root",
+            database="pos_7"
+        )
+
+        query = """
+            SELECT ID, order_date, ship_date, customer_id, product_id, product_name FROM orders
+        """
+
+        cursor = conn.cursor()
+        cursor.execute(query)
+        data = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        columns = ['ID', 'order_date', 'ship_date', 'customer_id', 'product_id', 'product_name']
+        orders_df = pd.DataFrame(data, columns=columns)
+        
+        return orders_df
+
+    except mysql.connector.Error as e:
+        print(f"Error connecting to MySQL: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame on error
+
+# Function to perform Market Basket Analysis
+def market_basket_analysis(orders_df):
+    try:
+        # Clone the DataFrame to avoid modifying the cached object
+        orders_df = orders_df.copy()
+        
+        # Convert order_date to datetime
+        orders_df['order_date'] = pd.to_datetime(orders_df['order_date'])
+
+        # Aggregate products by customer to form transactions
+        transactions = orders_df.groupby(['customer_id'])['product_name'].apply(list).reset_index()
+
+        # Prepare data for MBA
+        transaction_list = transactions['product_name'].tolist()
+
+        # Transform the transaction data
+        transaction_encoder = TransactionEncoder()
+        transaction_encoder_ary = transaction_encoder.fit(transaction_list).transform(transaction_list)
+        transaction_df = pd.DataFrame(transaction_encoder_ary, columns=transaction_encoder.columns_)
+
+        # Apply Apriori algorithm to find frequent itemsets
+        frequent_itemsets = apriori(transaction_df, min_support=0.001, use_colnames=True)
+
+        # Generate association rules
+        if not frequent_itemsets.empty:
+            rules = association_rules(frequent_itemsets, metric="lift", min_threshold=0.001)
+
+            # Filter out rules with confidence of 1 to avoid infinite conviction
+            rules = rules[rules['confidence'] < 1]
+
+            # Sort rules by lift in descending order and drop duplicates based on lift
+            rules = rules.sort_values(by='lift', ascending=False).drop_duplicates(subset=['lift'])
+
+            # Add count of occurrences
+            rules['count'] = rules.apply(lambda row: sum(transaction_df[list(row['antecedents'])].all(axis=1) & transaction_df[list(row['consequents'])].all(axis=1)), axis=1)
+
+            # Convert frozenset to list for JSON serialization
+            rules['antecedents'] = rules['antecedents'].apply(lambda x: list(x))
+            rules['consequents'] = rules['consequents'].apply(lambda x: list(x))
+
+            # Convert support, confidence, and lift to two decimal places as strings
+            rules['support'] = (rules['support'] * 100).map('{:.2f}%'.format)
+            rules['confidence'] = (rules['confidence'] * 100).map('{:.2f}%'.format)
+            rules['lift'] = rules['lift'].map('{:.2f}'.format)
+
+            # Select only the relevant columns
+            rules = rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']]
+
+            return rules
+        else:
+            return pd.DataFrame()
+
+    except Exception as e:
+        print(f"Error in market basket analysis: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame on error
+
+# Function to generate insights from association rules
+def generate_insights(rules):
+    insights = []
+    for idx, rule in enumerate(rules.head(5).itertuples(), start=1):
+        antecedents = ', '.join(rule.antecedents)
+        consequents = ', '.join(rule.consequents)
+        insight = f"{idx}. {antecedents} and {consequents}"
+        insights.append(insight)
+    return insights
+
+# Endpoint to fetch MBA insights
+@app.route('/api/mba-insights', methods=['GET'])
+def get_mba_insights():
+    orders_df = fetch_orders_data()
+    rules = market_basket_analysis(orders_df)
+
+    if not rules.empty:
+        insights = generate_insights(rules)
+        return jsonify({'insights': insights})
+    else:
+        return jsonify({'error': 'No association rules found. Try lowering the min_threshold value.'})
+
+# Endpoint to fetch top 10 association rules as DataFrame
+@app.route('/api/mba-dataframe', methods=['GET'])
+def get_mba_dataframe():
+    orders_df = fetch_orders_data()
+    rules = market_basket_analysis(orders_df)
+
+    if not rules.empty:
+        # Limiting to top 10 rows as requested
+        top_10_rules = rules.head(10)
+        top_10_rules_dict = top_10_rules.to_dict(orient='records')
+        return jsonify(top_10_rules_dict)
+    else:
+        return jsonify({'error': 'No association rules found. Try lowering the min_threshold value.'})
+
+if __name__ == '__main__':
+    app.run(debug=True)
