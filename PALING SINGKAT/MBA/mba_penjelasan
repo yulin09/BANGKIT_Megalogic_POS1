@@ -1,0 +1,17 @@
+[
+  {
+    "Metric": "Support",
+    "Definition": "Proportion of transactions that contain a specific itemset.",
+    "Interpretation": "Indicates how frequently an itemset (combination of items) appears together in the dataset."
+  },
+  {
+    "Metric": "Confidence",
+    "Definition": "Likelihood of item Y being purchased when item X is purchased.",
+    "Interpretation": "Measures the strength of the rule (association) that if item X is purchased, then item Y is also likely to be purchased."
+  },
+  {
+    "Metric": "Lift",
+    "Definition": "Measures how much more likely item Y is to be purchased when item X is purchased, compared to its likelihood without considering item X.",
+    "Interpretation": "Indicates the strength of the association between item X and item Y, considering the baseline probability of purchasing item Y."
+  }
+]

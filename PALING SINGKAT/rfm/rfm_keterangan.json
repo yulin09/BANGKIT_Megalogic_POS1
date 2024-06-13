@@ -1,0 +1,38 @@
+[
+    {
+      "Segment": "Best Customers",
+      "Description": "Customers who made the most recent purchases, purchased the most frequently, and bought the highest number of items",
+      "Marketing": "By recognizing and rewarding your best customers with exclusive discounts, enhanced loyalty rewards, personalized recommendations, early access to sales, and thank-you gifts, you can strengthen their loyalty, increase their lifetime value, and encourage them to continue being advocates for your brand"
+    },
+    {
+      "Segment": "Loyal Customers",
+      "Description": "Customer who purchased the most frequently",
+      "Marketing": "By recognizing and rewarding your loyal customers with personalized offers, exclusive benefits, and enhanced engagement, you can strengthen their loyalty, increase their lifetime value, and encourage them to continue being advocates for your brand"
+    },
+    {
+      "Segment": "Big Spenders Customers",
+      "Description": "Customer who spends the most on your products",
+      "Marketing": "By recognizing and rewarding your big spenders' customers with exclusive discounts, offering unique rewards only available to them, giving thank-you gifts, and providing faster loyalty points accumulation to enhance their shopping experience, foster loyalty, and increase their lifetime value"
+    },
+    {
+      "Segment": "Almost Lost Customers",
+      "Description": "Customers who haven't purchased for some time but used to purchase frequently and spend the most",
+      "Marketing": "By implementing personalized emails/messages, offering special incentives, limited-time offer, offer bonus loyalty points/rewards if they make a purchase within a specific timeframe, send a survey to understand why they stopped purchasing and what changes they would like to see"
+    },
+    {
+      "Segment": "Lost Customers",
+      "Description": "Customers who have ceased all transactions but who previously purchased frequently and spent the most",
+      "Marketing": "By understanding the reasons for their departure, learning from their feedback, and exploring possible reactivation strategies if feasible"
+    },
+    {
+      "Segment": "Lost Cheap Customers",
+      "Description": "Customers who purchased a long time ago, infrequently, and spent little",
+      "Marketing": "Don’t spend too much trying to re-acquire, but you can offer inexpensive incentives or encourage them to join your loyalty program by offering points on sign-up"
+    },
+    {
+      "Segment": "Others",
+      "Description": "Diverse group of customers with varying engagement levels.",
+      "Marketing": "Test different marketing approaches (e.g., discounts, personalized emails) and measure their impact"
+    }
+  ]
+  

@@ -1,0 +1,132 @@
+from flask import Flask, jsonify, send_from_directory
+import mysql.connector
+import pandas as pd
+from kmodes.kprototypes import KPrototypes
+from sklearn.preprocessing import LabelEncoder
+import os
+
+app = Flask(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    'host': '103.219.251.246',
+    'user': 'braincor_ps01',
+    'password': 'Bangkit12345.',
+    'database': 'braincor_ps01'
+}
+
+# Function to fetch data from the database
+def fetch_customer_data():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        query = """
+            SELECT ID, customer_name, gender, age, job, segment, total_spend, previous_purchase FROM customers
+        """
+        cursor = conn.cursor()
+        cursor.execute(query)
+        data = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        columns = ['ID', 'customer_name', 'gender', 'age', 'job', 'segment', 'total_spend', 'previous_purchase']
+        customer_df = pd.DataFrame(data, columns=columns)
+        return customer_df
+    except mysql.connector.Error as e:
+        print(f"Database error: {e}")
+        return None
+
+# Create membership column if it doesn't exist
+def create_membership_column_if_not_exists():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SHOW COLUMNS FROM customers LIKE 'membership'")
+        result = cursor.fetchone()
+        if not result:
+            cursor.execute("ALTER TABLE customers ADD membership INT")
+            conn.commit()
+        cursor.close()
+        conn.close()
+    except mysql.connector.Error as e:
+        print(f"Database error: {e}")
+
+# Preprocess the data
+def preprocess_data(customer_df):
+    df = customer_df.drop(['ID', 'customer_name'], axis=1)
+    le = LabelEncoder()
+    for column in ['gender', 'job', 'segment']:
+        df[column] = le.fit_transform(df[column])
+    return df, customer_df['ID']
+
+# Apply K-Prototypes algorithm
+def apply_kprototypes(df, n_clusters=5):
+    kproto = KPrototypes(n_clusters=n_clusters, init='Huang', random_state=42)
+    clusters = kproto.fit_predict(df, categorical=[0, 2, 3])
+    return clusters, kproto
+
+# Create the summary table
+def create_summary_table(df, clusters):
+    df['Cluster'] = clusters
+    cluster_labels = {2: 'bronze', 3: 'silver', 1: 'gold', 4: 'platinum', 0: 'diamond'}
+    df['Cluster_Label'] = df['Cluster'].map(cluster_labels)
+    summary_table = df.groupby(['Cluster_Label'])[['previous_purchase', 'total_spend']].sum().reset_index()
+    return summary_table
+
+# Update the database with new cluster labels
+def update_database_with_clusters(ids, clusters):
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        update_query = """
+            UPDATE customers
+            SET membership = %s
+            WHERE ID = %s
+        """
+        cluster_labels = {2: 'bronze', 3: 'silver', 1: 'gold', 4: 'platinum', 0: 'diamond'}
+        data_to_update = [(cluster_labels[clusters[i]], int(ids[i])) for i in range(len(ids))]
+        cursor.executemany(update_query, data_to_update)
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except mysql.connector.Error as e:
+        print(f"Database error: {e}")
+
+@app.route('/customers-piechart', methods=['GET'])
+def get_cluster_counts():
+    customer_df = fetch_customer_data()
+    if customer_df is None:
+        return jsonify({"error": "Unable to fetch customer data"}), 500
+    df, ids = preprocess_data(customer_df)
+    clusters, kproto = apply_kprototypes(df, n_clusters=5)
+    update_database_with_clusters(ids, clusters)
+    cluster_labels = {2: 'bronze', 3: 'silver', 1: 'gold', 4: 'platinum', 0: 'diamond'}
+    df['Cluster'] = clusters
+    df['Cluster_Label'] = df['Cluster'].map(cluster_labels)
+    cluster_counts = df['Cluster_Label'].value_counts().reindex(cluster_labels.values(), fill_value=0)
+    series = cluster_counts.tolist()
+    result = {
+        'series': series,
+        'labels': list(cluster_labels.values())
+    }
+    return jsonify(result)
+
+
+@app.route('/customers-barplot', methods=['GET'])
+def summary():
+    customer_df = fetch_customer_data()
+    if customer_df is None:
+        return jsonify({"error": "Unable to fetch customer data"}), 500
+    df, _ = preprocess_data(customer_df)
+    clusters, _ = apply_kprototypes(df, n_clusters=5)
+    df['Cluster'] = clusters
+    cluster_labels = {2: 'bronze', 3: 'silver', 1: 'gold', 4: 'platinum', 0: 'diamond'}
+    df['Cluster_Label'] = df['Cluster'].map(cluster_labels)
+    summary_table = df.groupby(['Cluster_Label'])['total_spend'].sum().reset_index()
+    summary_table = summary_table.sort_values(by='total_spend', ascending=False)  # Sort by highest total spend
+    result = {
+        'cluster_labels': summary_table['Cluster_Label'].tolist(),
+        'total_spend': summary_table['total_spend'].tolist()
+    }
+    return jsonify(result)
+
+if __name__ == '__main__':
+    app.run(debug=True)
